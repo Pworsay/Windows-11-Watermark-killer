@@ -3,7 +3,7 @@
 #include "util/file.hxx"
 #include "util/memory.hxx"
 
-void schedule_delete_task (const std::string& file_path) {
+auto schedule_delete_task (const std::string& file_path) -> void {
 	std::println ("\nScheduling a task to delete an old file at computer startup..");
 
 	const auto task_name = "DeleteShell32Prev";
@@ -26,13 +26,14 @@ auto startup () -> int {
 	if (!GetSystemDirectoryA (system_folder, MAX_PATH) ||
 		GetEnvironmentVariableA ("APPDATA", appdata_folder, MAX_PATH) == 0 ||
 		!GetUserNameA (username, &username_size)) {
-		std::cerr << "Failed to get parameters" << std::endl;
-		return 1;
+		throw std::runtime_error ("Failed to get system folder, appdata folder or username");
 	}
 
 	const auto my_folder = std::format ("{}\\Windows11WatermarkKiller", appdata_folder);
 	if (!std::filesystem::exists (my_folder)) {
-		std::filesystem::create_directory (my_folder);
+		if (!std::filesystem::create_directory (my_folder)) {
+			throw std::runtime_error ("Failed to create directory");
+		}
 	}
 
 	const auto shell32_path = std::format ("{}\\shell32.dll", system_folder);
@@ -41,7 +42,9 @@ auto startup () -> int {
 	const auto dst_shell32_path = std::format ("{}\\shell32.dll", my_folder);
 
 	if (!std::filesystem::exists (shell32_backup_path)) {
-		std::filesystem::copy_file (shell32_path, shell32_backup_path);
+		if (!std::filesystem::copy_file (shell32_path, shell32_backup_path)) {
+			throw std::runtime_error ("Failed to backup shell32.dll");
+		}
 	}
 
 	std::println ("Windows 11 Watermark killer\n");
@@ -54,8 +57,7 @@ auto startup () -> int {
 	std::cin >> option;
 
 	if (option != 'r' && option != 'p') {
-		std::cerr << "Invalid option" << std::endl;
-		return 1;
+		throw std::runtime_error ("Invalid option");
 	}
 
 	std::println ("\nGetting the right to shell32.dll");
@@ -68,29 +70,25 @@ auto startup () -> int {
 	} else if (option == 'p') {
 		const auto file = util::load_file (shell32_backup_path);
 		if (file.empty ()) {
-			std::cerr << "Failed to load file" << std::endl;
-			return 1;
+			throw std::runtime_error ("Failed to load shell32.dll file");
 		}
 
 		/* CDesktopWatermark::s_DesktopBuildPaint */
 		const auto pattern = util::search_pattern (util::memory_section_t {file.data (), file.size ()},
 			"\x48\x89\x5C\x24\x20\x55\x56\x57\x41\x54\x41\x55\x41\x56\x41\x57\x48\x8D\xAC\x24\x70\xF9\xFF\xFF", "xxxxxxxxxxxxxxxxxxxxxxxx");
 		if (!pattern) {
-			std::cerr << "Failed to find pattern" << std::endl;
-			return 1;
+			throw std::runtime_error ("Failed to find pattern");
 		}
 
 		*pattern->as<uint8_t*> () = 0xC3;
 		if (!util::save_file (dst_shell32_path, file)) {
-			std::cerr << "Failed to save file" << std::endl;
-			return 1;
+			throw std::runtime_error ("Failed to save patched shell32.dll file");
 		}
 
 		std::filesystem::rename (shell32_path, shell32_prev_path);
 		std::filesystem::copy_file (dst_shell32_path, shell32_path);
 	} else {
-		std::cerr << "Invalid option" << std::endl;
-		return 1;
+		throw std::runtime_error ("Invalid option");
 	}
 
 	schedule_delete_task (shell32_prev_path);
