@@ -1,6 +1,6 @@
 # Windows 11 Watermark killer
 
-Simple utility to jam the Windows watermark renderer on your desktop
+Simple utility to jam the Windows watermark renderer on your desktop **(x64 only)**
 ## Resources
 [Releases](https://github.com/gitkult/Windows-11-Watermark-killer/releases)
 ## Possible Errors
